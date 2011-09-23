@@ -125,7 +125,7 @@ setvariables() {
 	# Project folder for .make and .profile
 	PROJECT_DIR=$AEGIR_HOME/projects/$PROJECT_NAME
 	
-	if [ "$DRUPAL_VERSION" = "6" ]; then THEME_NAME="terrain" ; fi
+	if [ "$DRUPAL_VERSION" = "6" ]; then THEME_NAME="garland" ; fi
 	if [ "$DRUPAL_VERSION" = "7" ]; then THEME_NAME="squaregrid" ; fi
 	
 	# Theme git folder
@@ -258,7 +258,8 @@ makethings() {
 	
 	# Edit .info for Profile settings
 	eval "sed -i s#Base#$PROJECT_NAME#g $PROJECT_INFO"
-	eval "sed -i s/squaregrid/$PROJECT_NAME/g $PROJECT_INFO"
+	if [ "$DRUPAL_VERSION" = "6" ]; then eval "sed -i s/miruku_theme/terrain/g $PROJECT_INFO" ; fi
+	if [ "$DRUPAL_VERSION" = "7" ]; then eval "sed -i s/miruku_theme/squaregrid/g $PROJECT_INFO" ; fi
 	
 	# Edit .profile name argument
 	eval "sed -i s/yourprofile/$PROFILE_SHORT/ $PROJECT_PROFILE"
@@ -313,7 +314,7 @@ aegirthings() {
 	echo
 	
 	# Set a site context in Aegir using the new platform and profile
-	echo "drush provision-save '@$PROJECT_DOMAIN' --uri='$PROJECT_DOMAIN' --context_type='site' --platform='@platform_$PROJECT_NAME' --profile='miruku_$PROJECT_NAME' --db_server=@server_master --debug"
+	echo "drush provision-save '@$PROJECT_DOMAIN' --uri='$PROJECT_DOMAIN' --context_type='site' --platform='@platform_$PROJECT_NAME' --profile='miruku_$PROJECT_NAME' --db_server=@server_master"
 	MIRUKU_PROV=stage5_aegirthings_platform_filesdrushsite
 
         drush --uri="$PROJECT_DOMAIN" provision-save "@$PROJECT_DOMAIN" --context_type='site' --platform="@platform_$PROJECT_NAME" --profile="$PROFILE_SHORT"
@@ -323,10 +324,10 @@ aegirthings() {
 	echo
 	
 	# Install site (init DB, etc.)
-	echo "drush @$PROJECT_DOMAIN provision-install -d -v"
+	echo "drush @$PROJECT_DOMAIN provision-install"
 	echo
 	cd $PROJECT_PLATFORM
-	drush "@$PROJECT_DOMAIN" provision-install -d -v
+	drush "@$PROJECT_DOMAIN" provision-install
 	drush @hostmaster hosting-dispatch
 	echo
 	
