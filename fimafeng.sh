@@ -1,16 +1,20 @@
 #!/bin/bash
 
-# This scripts expects the following in /var/aegir
-#   /basefiles
-#   /basefiles/miruku_features
-#   /basefiles/miruku_features/miruku_wysiwyg_img_basic
-#   /basefiles/miruku_d6_core etc.
-#   /makefiles/
-#   /projects
-#   /scripts
+# fimafeng
+# provision script for aegir by milk
+# https://github.com/milkmiruku/fimafeng
+
+# /var/aegir/fimafeng - containing this script
+# /var/aegir/basefiles - containing base make/info files
+# /var/aegir/projects - contains origin git repos
+
+# edit paths and filenames below to point to your own base files
+# use the .profile from the profiler module
+
 
 #logfile=logs/miruku_$1.log
 #exec > $logfile 2>&1
+
 
 ### Bashtrap for cleaning up after ctrl-c
 
@@ -55,6 +59,7 @@ bashtrap() {
 	fi
 }
 
+
 ### Check user is aegir
 
 dependencies() {
@@ -63,6 +68,7 @@ dependencies() {
 		exit 1
 	fi
 }
+
 
 # Set options from command line input
 
