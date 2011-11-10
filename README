@@ -1,0 +1,13 @@
+fimafeng 0.2
+
+provision script for aegir by milk
+https://github.com/milkmiruku/fimafeng
+
+post issues on github, or fork, patch and push, thanks!
+
+/var/aegir/fimafeng - containing this script
+/var/aegir/basefiles - containing base make/info files
+/var/aegir/projects - contains origin git repos for config (copied from base files) and theme                                                                         
+
+edit paths and filenames below to point to your own base files
+use the .profile from the profiler module
