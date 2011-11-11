@@ -21,7 +21,7 @@
 trap bashtrap INT
 
 bashtrap() {
-	echo "Exiting script, removing files"
+	echo -e "\n\n*** Exiting script, removing files"
 	if [ "$MIRUKU_PROV" = "stage1_begin" ];then
 		exit
 	elif [ "$MIRUKU_PROV" = "stage2_makethings" ];then
@@ -73,7 +73,7 @@ dependencies() {
 # Set options from command line input
 
 getoptions() {
-	while getopts ":p:a:do:" opt; do
+	while getopts ":p:a:do:v" opt; do
 		case $opt in
 			p)
 				PROJECT_NAME="$OPTARG"
@@ -87,13 +87,16 @@ getoptions() {
 			o)
 				SCRIPT_TASK="$OPTARG"
 				;;
+			v)
+				VERBOSE_MODE="-v"
+				;;
 		esac
 	done
 
 	if [ ! "$DRUPAL_VERSION" ] ; then DRUPAL_VERSION=7 ; fi
 
 	if [ ! "$PROJECT_NAME" ] || [ ! "$PROJECT_DOMAIN" ] || [ ! "$SCRIPT_TASK" ] ; then
-		echo "*** Milk's Aeigr provision script"
+		echo "*** Fimafeng provision script for Aegir"
 		echo "*** Missing argument(s):"
 		echo "*** -p projectname (cannot contain hyphens)"
 		echo "*** -a project.domain"
@@ -102,12 +105,13 @@ getoptions() {
 		echo "*** -o b (just provision)"
 		echo "*** -o r (remove platform)"
 		echo "*** -o ra (remove project)"
+		echo "*** -v (verbose)"
 		exit
 	fi
 
 	echo
 	echo "**********************************"
-	echo "*** Milk's Aeigr provision script"
+	echo "*** Fimafeng provision script for Aegir"
 	echo "*** Project: $PROJECT_NAME"
 	echo "*** Domain: $PROJECT_DOMAIN"
 	echo -n "*** Task: "
@@ -116,7 +120,8 @@ getoptions() {
 	elif [ "$SCRIPT_TASK" = "r" ] ; then echo "removing project"
 	elif [ "$SCRIPT_TASK" = "ra" ] ; then echo "removing platform and project" ; fi
 	echo "*** Drupal: $DRUPAL_VERSION"
-	echo "**********************************"
+	if [ "$VERBOSE_MODE" = "-v" ]; then echo "*** Verbose mode on" ; fi
+	echo -e "**********************************\n"
 }
 
 
@@ -306,29 +311,29 @@ aegirplatform() {
 	# Build platform with Drush Make
 	echo "drush make --working-copy $PROJECT_MAKE $PROJECT_PLATFORM"
 	MIRUKU_PROV=stage3_aegirthings_platform_files
-	drush make --working-copy $PROJECT_MAKE $PROJECT_PLATFORM
+	drush make --working-copy "$PROJECT_MAKE" "$PROJECT_PLATFORM" "$VERBOSE_MODE"
 	echo
 	
 	# Set an Aegir context for that platform
 	echo "drush provision-save '@platform_$PROJECT_NAME' --root='$PROJECT_PLATFORM' --context_type='platform'"
 	MIRUKU_PROV=stage4_aegirthings_platform_filesdrush
-	drush provision-save "@platform_$PROJECT_NAME" --root="$PROJECT_PLATFORM" --context_type="platform"
+	drush provision-save "@platform_$PROJECT_NAME" --root="$PROJECT_PLATFORM" --context_type="platform" "$VERBOSE_MODE"
 	drush @hostmaster hosting-dispatch
 	echo
 	
 	# Import that platform into hostmaster, the Aegir frontend
 	echo "drush @hostmaster hosting-import '@platform_$PROJECT_NAME'"
-	drush @hostmaster hosting-import "@platform_$PROJECT_NAME"
+	drush @hostmaster hosting-import "@platform_$PROJECT_NAME" "$VERBOSE_MODE"
 	drush @hostmaster hosting-dispatch
 	echo
 }
 
 aegirsite() {
 	# Set a site context in Aegir using the new platform and profile
-	echo "drush provision-save '@$PROJECT_DOMAIN' --uri='$PROJECT_DOMAIN' --context_type='site' --platform='@platform_$PROJECT_NAME' --profile='miruku_$PROJECT_NAME' --db_server=@server_master"
+	echo "drush provision-save '@$PROJECT_DOMAIN' --uri='$PROJECT_DOMAIN' --context_type='site' --platform='@platform_$PROJECT_NAME' --profile='miruku_$PROJECT_NAME' --db_server=@server_master" "$VERBOSE_MODE"
 	MIRUKU_PROV=stage5_aegirthings_platform_filesdrushsite
 
-	drush --uri="$PROJECT_DOMAIN" provision-save "@$PROJECT_DOMAIN" --context_type='site' --platform="@platform_$PROJECT_NAME" --profile="$PROFILE_SHORT"
+	drush --uri="$PROJECT_DOMAIN" provision-save "@$PROJECT_DOMAIN" --context_type='site' --platform="@platform_$PROJECT_NAME" --profile="$PROFILE_SHORT" "$VERBOSE_MODE"
 
 	drush @hostmaster hosting-dispatch
 	echo
@@ -337,7 +342,7 @@ aegirsite() {
 	echo "drush @$PROJECT_DOMAIN provision-install"
 	echo
 	cd $PROJECT_PLATFORM
-	drush "@$PROJECT_DOMAIN" provision-install
+	drush "@$PROJECT_DOMAIN" provision-install "$VERBOSE_MODE"
 	drush @hostmaster hosting-dispatch
 	echo
 	
@@ -345,7 +350,7 @@ aegirsite() {
 	
 	# Verify the platform to auto-'import' the site in the frontend
 	echo "drush @hostmaster hosting-task @platform_$PROJECT_NAME verify"
-	drush @hostmaster hosting-task @platform_$PROJECT_NAME verify --force
+	drush @hostmaster hosting-task @platform_$PROJECT_NAME verify --force "$VERBOSE_MODE"
 	drush @hostmaster hosting-dispatch
 	echo
 	
@@ -434,7 +439,7 @@ setvariables
 
 if [ "$SCRIPT_TASK" = "a" ]; then makeproject ; fi
 if [ "$SCRIPT_TASK" = "a" ]; then aegirplatform ; fi
-if [ "$SCRIPT_TASK" = "a" ] || [ "$SCRIPT_TASK" = "b" ] ; then aegirsite ; fi
+if [ "$SCRIPT_TASK" = "a" ] || [ "$SCRIPT_TASK" = "b" ]; then aegirsite ; fi
 
 if [ "$SCRIPT_TASK" = "r" ]; then removesite ; fi
 if [ "$SCRIPT_TASK" = "ra" ]; then removeplatform ; fi
