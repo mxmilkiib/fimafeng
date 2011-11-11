@@ -6,7 +6,7 @@
 
 # /var/aegir/fimafeng - containing this script
 # /var/aegir/basefiles - containing base make/info files
-# /var/aegir/projects - contains origin git repos
+# /var/aegir/projects - contains origin git repos for config (copied from base files) and theme
 
 # edit paths and filenames below to point to your own base files
 # use the .profile from the profiler module
@@ -161,7 +161,7 @@ setvariables() {
 }
 
 
-makethings() {
+makeproject() {
 	# Script stage counter
 	MIRUKU_PROV=stage2_makethings
 	
@@ -295,7 +295,7 @@ makethings() {
 
 ### Create and Aegerise site
 
-aegirthings() {
+aegirplatform() {
 	echo "* Start doing Drush things now..."
 	echo
 	
@@ -321,7 +321,9 @@ aegirthings() {
 	drush @hostmaster hosting-import "@platform_$PROJECT_NAME"
 	drush @hostmaster hosting-dispatch
 	echo
-	
+}
+
+aegirsite() {
 	# Set a site context in Aegir using the new platform and profile
 	echo "drush provision-save '@$PROJECT_DOMAIN' --uri='$PROJECT_DOMAIN' --context_type='site' --platform='@platform_$PROJECT_NAME' --profile='miruku_$PROJECT_NAME' --db_server=@server_master"
 	MIRUKU_PROV=stage5_aegirthings_platform_filesdrushsite
@@ -355,7 +357,20 @@ aegirthings() {
 }
 
 
+# Removing things
+
+removesite() {
+	echo "*** Removing site"
+
+	# Create delete site task in hostmaster
+	drush @hostmaster hosting-task @"$PROJECT_DOMAIN" delete
+	drush @hostmaster hosting-dispatch
+}
+
+
 removeplatform() {
+	echo "*** Removing platform"
+
 	# Create delete site task in hostmaster
 	drush @hostmaster hosting-task @"$PROJECT_DOMAIN" delete
 	drush @hostmaster hosting-dispatch
@@ -377,19 +392,20 @@ removeplatform() {
 	#drush @hostmaster hosting-dispatch
 
     	if [ -d $PROJECT_PLATFORM ]; then rm -rf $PROJECT_PLATFORM ; fi
-	echo "rm $PROJECT_PLATFORM"
     exit
 }
 
 
 removeproject() {
+	echo "*** Removing platform and project"
+
         # Create delete site task in hostmaster
         drush @hostmaster hosting-task @"$PROJECT_DOMAIN" delete
         drush @hostmaster hosting-dispatch
 
         # Create delete task in hostmaster
-        drush @hostmaster hosting-task @platform_"$PROJECT_NAME" delete
-        drush @hostmaster hosting-dispatch
+        #drush @hostmaster hosting-task @platform_"$PROJECT_NAME" delete
+        #drush @hostmaster hosting-dispatch
 
 	# Removes site files, db and vhost
     	#drush "@$PROJECT_DOMAIN" provision-delete --force
@@ -416,7 +432,10 @@ dependencies
 getoptions "$@"
 setvariables
 
-if [ "$SCRIPT_TASK" = "a" ]; then makethings ; fi
-if [ "$SCRIPT_TASK" = "a" ] || [ "$SCRIPT_TASK" = "b" ] ; then aegirthings ; fi
-if [ "$SCRIPT_TASK" = "r" ]; then removeplatform ; fi
-if [ "$SCRIPT_TASK" = "ra" ]; then removeproject ; fi
+if [ "$SCRIPT_TASK" = "a" ]; then makeproject ; fi
+if [ "$SCRIPT_TASK" = "a" ]; then aegirplatform ; fi
+if [ "$SCRIPT_TASK" = "a" ] || [ "$SCRIPT_TASK" = "b" ] ; then aegirsite ; fi
+
+if [ "$SCRIPT_TASK" = "r" ]; then removesite ; fi
+if [ "$SCRIPT_TASK" = "ra" ]; then removeplatform ; fi
+if [ "$SCRIPT_TASK" = "rb" ]; then removeproject ; fi
