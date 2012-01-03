@@ -1,13 +1,21 @@
-fimafeng 0.2
+fimafeng 0.3
 
 provision script for aegir by milk
 https://github.com/milkmiruku/fimafeng
 
-post issues on github, or fork, patch and push, thanks!
+this is a script for my setup. you are responsible for using it! checks the script first, somethings might break on your system. to add checks for portablity. 
 
-/var/aegir/fimafeng - containing this script
-/var/aegir/basefiles - containing base make/info files
-/var/aegir/projects - contains origin git repos for config (copied from base files) and theme                                                                         
+note:
+shflags - uses getopt - no long flags on some systems
 
-edit paths and filenames below to point to your own base files
-use the .profile from the profiler module
+usage:
+./fimafeng.sh --help
+
+required:
+/var/aegir/ff/ - containing this script
+/var/aegir/ff/base/ - containing base make/info files
+/var/aegir/ff/projects - contains project profile (.make/.info/theme) git repos (initial clone from /base)
+
+
+history:
+0.3 - 25/12/2011 - further refactored the whole thing.

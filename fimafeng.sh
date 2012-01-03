@@ -1,299 +1,301 @@
 #!/bin/bash
 
-# fimafeng
-# provision script for aegir by milk
-# https://github.com/milkmiruku/fimafeng
+# Aegir FF (Fimafeng), devprovision helper script by Milk Miruku
+# report bugs via https://github.com/milkmiruku/fimafeng, thank you
 
-# /var/aegir/fimafeng - containing this script
-# /var/aegir/basefiles - containing base make/info files
-# /var/aegir/projects - contains origin git repos for config (copied from base files) and theme
+# /var/aegir/ff - containing this script
+# ff/base - containing base make/info files
+# ff/projects - contains origin git repos for config (copied from base files) and theme
 
-# edit paths and filenames below to point to your own base files
-# use the .profile from the profiler module
+# required:
+# ff/shflags http://code.google.com/p/shflags/
 
+# changelog
+# 0.3 - big refactor, included base profiles, etc., added changelog
 
-#logfile=logs/miruku_$1.log
+# todo;
+# - fix removing platforms
+# - fix logging
+# - make certain it doesn't break things
+# - etc.
+
+#logfile=logs/ff_.log
 #exec > $logfile 2>&1
 
+#testing:
+#set -e # Don't plow on after errors
+#set -v mode # prints commands to be executed to stderr, prints everything before anything ( substitutions and expansions, ...) big is applied
+#set -x mode 
 
 ### Bashtrap for cleaning up after ctrl-c
 
-trap bashtrap INT
-
+# trap bashtrap INT - neutered for testing
 bashtrap() {
-	echo -e "\n\n*** Exiting script, removing files"
-	if [ "$MIRUKU_PROV" = "stage1_begin" ];then
+ 	echo -e "\n\n*** Exiting script, removing files"
+	if [ "$FF_STAGE" = "stage1_begin" ];then
 		exit
-	elif [ "$MIRUKU_PROV" = "stage2_makethings" ];then
-		if [ "$SCRIPT_TASK" = "a" ]; then rm -rf $PROJECT_DIR ; fi
+	elif [ "$FF_STAGE" = "stage2_makeproject" ];then
+		if [ "$SCRIPT_TASK" = "a" ]; then rm -rf $PROJECT_PATH ; fi
 		echo
 		exit
-	elif [ "$MIRUKU_PROV" = "stage3_aegirthings_platform_files" ];then
-		if [ "$SCRIPT_TASK" = "a" ]; then rm -rf $PROJECT_DIR ; fi
-		rm -rf $PROJECT_PLATFORM
+	elif [ "$FF_STAGE" = "stage3_aegirthings_platform_files" ];then
+		if [ "$SCRIPT_TASK" = "a" ]; then rm -rf $PROJECT_PATH ; fi
+		rm -rf $PLATFORM_PATH
 		echo
 		exit
-	elif [ "$MIRUKU_PROV" = "stage4_aegirthings_platform_filesdrush" ];then
+	elif [ "$FF_STAGE" = "stage4_aegirthings_platform_filesdrush" ];then
 		# Removes Drush platform alias
-		drush provision-save "@platform_$PROJECT_NAME" --root="$PROJECT_PLATFORM" --delete
+		drush provision-save "@platform_"$PLATFORM_NAME"" --root="$PLATFORM_PATH" --delete
 		drush @hostmaster hosting-dispatch
 		
-		if [ "$SCRIPT_TASK" = "a" ]; then rm -rf $PROJECT_DIR ; fi
-		rm -rf $PROJECT_PLATFORM
+		if [ "$SCRIPT_TASK" = "a" ]; then rm -rf $PROJECT_PATH ; fi
+		rm -rf $PLATFORM_PATH
 		echo
 		exit
-	elif [ "$MIRUKU_PROV" = "stage5_aegirthings_platform_filesdrushsite" ];then
+	elif [ "$FF_STAGE" = "stage5_aegirthings_platform_filesdrushsite" ];then
 		# Removes site files, db and vhost
-		drush "@$PROJECT_DOMAIN" provision-delete 
+		drush "@$SITE_DOMAIN" provision-delete 
 		# Removes Drush site alias
-		drush provision-save --root="$PROJECT_PLATFORM" "@$PROJECT_DOMAIN" --delete
+		drush provision-save --root="$PLATFORM_PATH" "@$SITE_DOMAIN" --delete
 		
 		# Removes Drush platform alias
-		drush provision-save "@platform_$PROJECT_NAME" --root="$PROJECT_PLATFORM" --delete
+		drush provision-save "@platform_"$PLATFORM_NAME"" --root="$PLATFORM_PATH" --delete
 		drush @hostmaster hosting-dispatch
 
-		rm -rf $PROJECT_DIR
-		rm -rf $PROJECT_PLATFORM
+		rm -rf $PROJECT_PATH
+		rm -rf $PLATFORM_PATH
 		echo
 		exit
 	fi
 }
 
 
-### Check user is aegir
+# Call script functions
+scriptprocess() {
+  dependencies
+  getoptions "$@"
+  variablechecks "$@"
 
+  if [ "$SCRIPT_TASK" = "a" ]; then makeproject ; fi
+  if [ "$SCRIPT_TASK" = "a" ] || [ "$SCRIPT_TASK" = "b" ]; then aegirplatform ; fi
+  if [ "$SCRIPT_TASK" = "a" ] || [ "$SCRIPT_TASK" = "b" ] || [ "$SCRIPT_TASK" = "c" ]; then aegirsite ; fi
+
+  if [ "$SCRIPT_TASK" = "rc" ]; then removesite ; fi
+  if [ "$SCRIPT_TASK" = "rb" ]; then removeplatform ; fi
+#  if [ "$SCRIPT_TASK" = "ra" ]; then removeproject ; fi
+}
+
+
+# Check user is aegir
 dependencies() {
-	if [ `whoami` != "aegir" ] ; then
+	if [ `whoami` != "aegir" ]; then
 		echo "This script should be ran as the aegir user."
 		exit 1
 	fi
+
+# projects folder exist?
+  if [ ! -d ./projects ]; then echo "no projects folder!"; fi
+
 }
 
 
 # Set options from command line input
 
 getoptions() {
-	while getopts ":p:a:do:v" opt; do
-		case $opt in
-			p)
-				PROJECT_NAME="$OPTARG"
-				;;
-			a)
-				PROJECT_DOMAIN="$OPTARG"
-				;;
-			d)
-				DRUPAL_VERSION="$OPTARG"
-				;;
-			o)
-				SCRIPT_TASK="$OPTARG"
-				;;
-			v)
-				VERBOSE_MODE="-v"
-				;;
-		esac
-	done
+  # source shflags -  http://code.google.com/p/shflags/wiki/Documentation10x
+  . shflags-1.0.3/src/shflags
 
-	if [ ! "$DRUPAL_VERSION" ] ; then DRUPAL_VERSION=7 ; fi
+  # define command-line string flags
+  DEFINE_string 'project' '' 'Project name (no spaces, hyphens)' 'p'
+  DEFINE_string 'platform' '' 'Platform name (default is project name)' 'l'
+  DEFINE_string 'domain' '' 'Site domain name' 'a'
+  DEFINE_string 'task' '' 'Task to perform.
+            a -  Create project, build platform and provision site
+            b -  Use existing project, build platform and provision site
+            c - Use existing project and platform, provision site
+            rc - Removing site
+            rb - Removing platform
+            ra - Removing project' 'o'
+  DEFINE_string 'drupal' '7' 'Drupal version (default is D7)' 'd'
+  DEFINE_boolean 'verbose' 'false' 'Verbose mode for Git and Drush' 'v'
+  DEFINE_boolean 'usage' 'false' 'Usage string examples' 'u'
+  DEFINE_boolean 'interactive' 'true' 'Prompt for continuation at points' 'i'
+  DEFINE_string 'theme' 'squaregrid' 'Base theme to use' 't'
 
-	if [ ! "$PROJECT_NAME" ] || [ ! "$PROJECT_DOMAIN" ] || [ ! "$SCRIPT_TASK" ] ; then
-		echo "*** Fimafeng provision script for Aegir"
-		echo "*** Missing argument(s):"
-		echo "*** -p projectname (cannot contain hyphens)"
-		echo "*** -a project.domain"
-		echo "*** -d6 / -d7 (drupal version)"
-		echo "*** -o a (create and provision)"
-		echo "*** -o b (just provision)"
-		echo "*** -o r (remove platform)"
-		echo "*** -o ra (remove project)"
-		echo "*** -v (verbose)"
-		exit
+  # parse the command-line
+  FLAGS "$@" || exit 1
+  # things that could not be parsed
+  eval set -- "${FLAGS_ARGV}"
+
+  # set variables
+  PROJECT_NAME="${FLAGS_project}"                                             # Required
+  PLATFORM_NAME="${FLAGS_platform}"                                           # Required
+  SITE_DOMAIN="${FLAGS_domain}"                                               # Required
+  SCRIPT_TASK="${FLAGS_task}"                                                 # Required
+  DRUPAL_VERSION="${FLAGS_drupal}"
+  BASE_THEME="${FLAGS_theme}"
+  VERBOSE_MODE="${FLAGS_verbose}"
+  USAGE_MODE="${FLAGS_usage}"
+  INTERACTIVE_MODE="${FLAGS_interactive}"
+
+	# Date string; year, month, day, hours, seconds
+	DATE="date +%Y%m%d%H%M%S"
+  # Not used yet
+  
+  if [ "$USAGE_MODE" == "0" ]; then
+    echo "Fimafeng usage examples:" 
+    echo " ./fimafeng.sh -p test -l test -a test.example.org -o a"
+    exit
+  fi
+
+}
+
+
+# check everything is ok
+variablechecks() {
+	FF_STAGE=stage1_begin                              	                      # Script stage counter
+
+	if [ -z "$PROJECT_NAME" ] || [ -z "$PLATFORM_NAME" ]  || [ -z "$SITE_DOMAIN" ] || [ -z "$SCRIPT_TASK" ] ; then
+		echo " Task fail: missing some argument"
+    echo ""
+    flags_help
+    echo ""
+		echo "Arguments: $@"
+	  exit 1
 	fi
 
-	echo
-	echo "**********************************"
-	echo "*** Fimafeng provision script for Aegir"
-	echo "*** Project: $PROJECT_NAME"
-	echo "*** Domain: $PROJECT_DOMAIN"
-	echo -n "*** Task: "
-	if [ "$SCRIPT_TASK" = "a" ]; then echo "create and provision"
-	elif [ "$SCRIPT_TASK" = "b" ]; then echo "just provision"
-	elif [ "$SCRIPT_TASK" = "r" ] ; then echo "removing project"
-	elif [ "$SCRIPT_TASK" = "ra" ] ; then echo "removing platform and project" ; fi
-	echo "*** Drupal: $DRUPAL_VERSION"
-	if [ "$VERBOSE_MODE" = "-v" ]; then echo "*** Verbose mode on" ; fi
-	echo -e "**********************************\n"
+  #if [ -n  "$PLATFORM_NAME" ] ; then PLATFORM_NAME=$PROJECT_NAME ; fi       # If platform is not used, project name becomes platform name
+
+	if [ -n "$BASE_THEME" ] ; then                                            # If no theme is set, use garland for D6, squaregrid for D7
+  	if [ "$DRUPAL_VERSION" = "6" ]; then BASE_THEME="garland" ; fi
+	  if [ "$DRUPAL_VERSION" = "7" ]; then BASE_THEME="squaregrid" ; fi
+  fi
+
+	AEGIR_PATH=$HOME                                       	                  # The Aegir dir, typically /var/aegir
+  FF_PATH="$AEGIR_PATH/ff"                                                  # Path of this script
+
+  if [ "$DRUPAL_VERSION" = "6" ]; then BASE_PROJECT=$FF_PATH/base/d6core.git/ ; fi
+  if [ "$DRUPAL_VERSION" = "7" ]; then BASE_PROJECT=$FF_PATH/base/d7core.git/ ; fi
+
+	# Project profile Git folder for .make, .info, .profile and theme folders
+ 	PROJECT_PATH=$FF_PATH/projects/$PROJECT_NAME.git                          # /var/aegir/ff/projects/projectname.git
+
+	THEMES_PATH=$PROJECT_PATH/themes
+	SUB_THEME=$THEMES_PATH/$PROJECT_NAME                                      # Project subtheme folder
+
+	PROJECT_MAKE=$PROJECT_PATH/$PROJECT_NAME.make                             # Distro .make
+	PROJECT_INFO=$PROJECT_PATH/$PROJECT_NAME.info                             # Distro .info
+	PROJECT_PROFILE=$PROJECT_PATH/$PROJECT_NAME.profile                       # Distro .profile, used by profiler library
+
+	PLATFORM_PATH=$AEGIR_PATH/platforms/$PLATFORM_NAME                        # Project platform folder
+
+  SITE_PATH=$PLATFORM_PATH/sites/$SITE_DOMAIN
+
+  echo "Fimafeng provision script for Aegir"
+  echo ""
+	echo " Project: $PROJECT_NAME"
+  echo " Platform: $PLATFORM_NAME"
+	echo " Domain: $SITE_DOMAIN"
+	echo " Drupal: $DRUPAL_VERSION"
+  echo "" 
+	echo -n " Task"
+  if [ "$SCRIPT_TASK" == "a" ]; then
+    echo ": a - Create project, build platform and provision site"
+    if [ -d "$PROJECT_PATH" ] ; then echo " Build fail: project already exists" ; exit 1 ; fi
+  elif [ "$SCRIPT_TASK" == "b" ]; then 
+    echo ": b - Use existing project, build platform and provision site"
+    if [ -d "$PLATFORM__PATH" ]; then echo " Build fail: platform already exists" ; exit 1 ; fi
+  elif [ "$SCRIPT_TASK" == "c" ]; then 
+    echo ": c - Use existing project and platform, provision site"
+    if  [ -d "$SITE_PATH" ]; then echo " Build fail: site aready exists" ; exit 1 ; fi
+  elif [ "$SCRIPT_TASK" == "rc" ] ; then echo ": rc - Removing site"
+  elif [ "$SCRIPT_TASK" == "rb" ] ; then echo ": rb - Removing platform and site"
+  elif [ "$SCRIPT_TASK" == "ra" ] ; then echo ": ra - Removing project, platform and site"
+  else echo " fail: $SCRIPT_TASK" ; exit 1 ; fi
+	if [ "$VERBOSE_MODE" == "0" ]; then
+    echo ""
+    echo " Verbose mode: on"
+    echo " Aegir: $AEGIR_PATH"
+    echo " FF: $FF_PATH"
+    echo ""
+    echo " Project path: $PROJECT_PATH"
+    echo " Project make: $PROJECT_MAKE"
+    echo " Project info: $PROJECT_INFO"
+    echo " Project profile: $PROJECT_PROFILE"
+    echo " Subtheme: $SUB_THEME"
+    echo ""
+    echo " Platform path: $PLATFORM_PATH"
+    echo " Site path: $SITE_PATH"
+    VERBOSE_MODE="-v"
+  else VERBOSE_MODE="" ; fi
+  echo ""
+  if [ "$INTERACTIVE_MODE" = "0" ]; then read -p "*** Press return to continue"; fi
+  echo ""
 }
-
-
-### Set some variables
-
-setvariables() {
-	# Script stage counter
-	MIRUKU_PROV=stage1_begin
-	
-	# The Aegir dir
-	AEGIR_HOME=$HOME
-	
-	# Project folder for .make and .profile
-	PROJECT_DIR=$AEGIR_HOME/projects/$PROJECT_NAME
-	
-	if [ "$DRUPAL_VERSION" = "6" ]; then THEME_NAME="garland" ; fi
-	if [ "$DRUPAL_VERSION" = "7" ]; then THEME_NAME="squaregrid" ; fi
-	
-	# Theme git folder
-	THEME_GIT=$PROJECT_DIR/theme.git
-	
-	# Subtheme folder
-	THEME_SUB=$PROJECT_DIR/theme.git/$PROJECT_NAME
-	
-	# Project config folder
-	CONFIG_GIT=$PROJECT_DIR/config.git
-	
-	# Make file
-	PROJECT_MAKE=$PROJECT_DIR/config.git/miruku_d$DRUPAL_VERSION\_$PROJECT_NAME.make
-	
-	# Config: Info file
-	PROJECT_INFO=$PROJECT_DIR/config.git/miruku_d$DRUPAL_VERSION\_$PROJECT_NAME.info
-	
-	# Config: Profile file
-	PROJECT_PROFILE=$PROJECT_DIR/config.git/miruku_d$DRUPAL_VERSION\_$PROJECT_NAME.profile
-
-	# Config: Profile short
-	PROFILE_SHORT=miruku_d$DRUPAL_VERSION\_$PROJECT_NAME
-
-	# Project platform folder
-	PROJECT_PLATFORM=$AEGIR_HOME/platforms/$PROJECT_NAME
-}
-
 
 makeproject() {
 	# Script stage counter
-	MIRUKU_PROV=stage2_makethings
+	FF_STAGE=stage2_makeproject
 	
-	# Create project folder
-	mkdir $PROJECT_DIR
-	mkdir $THEME_GIT
-	mkdir $THEME_SUB
-	mkdir $CONFIG_GIT
-	
-	# Clone base theme to new repo
-	cd $THEME_GIT
-	
-	if [ "$DRUPAL_VERSION" = "6" ]; then
-		git clone http://git.drupal.org/project/terrain.git
-		cd terrain
-		rm -rf .git/
-		
-		# Setup subtheme
-		cd $THEME_SUB
-		echo "; Terrain subtheme" > $PROJECT_NAME.info
-		echo "" >> $PROJECT_NAME.info
-		echo "name = $PROJECT_NAME" >> $PROJECT_NAME.info
-		echo "description = Terrain subtheme for $PROJECT_NAME" >> $PROJECT_NAME.info
-		echo "core = 6.x" >> $PROJECT_NAME.info
-		echo "engine = phptemplate" >> $PROJECT_NAME.info
-		echo "base theme = terrain" >> $PROJECT_NAME.info
-		echo "" >> $PROJECT_NAME.info
-		echo "stylesheets[all][] = css/$PROJECT_NAME.css" >> $PROJECT_NAME.info
-		mkdir css
-		touch css/$PROJECT_NAME.css
-	fi
-	
-	if [ "$DRUPAL_VERSION" = "7" ]; then
-		git clone --branch 7.x-2.x http://git.drupal.org/project/squaregrid.git
-		cd squaregrid
-		rm -rf .git/
-		
-		# Setup subtheme
-		cd $THEME_SUB
-		echo "; Squaregrid subtheme" > $PROJECT_NAME.info
-		echo "" >> $PROJECT_NAME.info
-		echo "name = $PROJECT_NAME" >> $PROJECT_NAME.info
-		echo "description = Squaregrid subtheme for $PROJECT_NAME" >> $PROJECT_NAME.info
-		echo "core = 7.x" >> $PROJECT_NAME.info
-		echo "engine = phptemplate" >> $PROJECT_NAME.info
-		echo "base theme = squaregrid" >> $PROJECT_NAME.info
-                echo "" >> $PROJECT_NAME.info
-                echo "stylesheets[all][] = css/$PROJECT_NAME.css" >> $PROJECT_NAME.info
-		
-		cp ../squaregrid/example.template.php.txt template.php
-		eval "sed -i s#YOURTHEMENAME#$PROJECT_NAME#g template.php"
+	# Git clone project theme from FF base
+	git clone -l --no-hardlinks $BASE_PROJECT $PROJECT_PATH
 
-                mkdir css
-                touch css/$PROJECT_NAME.css
-	fi
-
-	# Ask to manually edit the theme before comitting
-	echo
-	echo "*** Please edit theme if so required"
-	read -p "*** Press return to continue"
-	echo ""
-	
-	# Add and commit initial changes to theme Git repo
-	cd $THEME_GIT
-	git init
-	git add --all
-	echo
-	git commit -m "Initial commit for $PROJECT_NAME theme"
-	
-	
-	### Project .make
-	
-	# Git clone project theme from miruku base
-	cd $PROJECT_DIR
-	
 	# Move files for new project 
-	if [ "$DRUPAL_VERSION" = "6" ]; then
-		git clone -l --no-hardlinks /var/aegir/basefiles/miruku_d6_base $CONFIG_GIT
-		cd $CONFIG_GIT
-		mv miruku_d6_base.make $PROJECT_MAKE
-		mv miruku_d6_base.profile $PROJECT_PROFILE
-		mv miruku_d6_base.info $PROJECT_INFO
-	fi
-
-	if [ "$DRUPAL_VERSION" = "7" ]; then
-		git clone -l --no-hardlinks /var/aegir/basefiles/miruku_d7_base $CONFIG_GIT
-		cd $CONFIG_GIT
-		mv miruku_d7_base.make $PROJECT_MAKE
-		mv miruku_d7_base.profile $PROJECT_PROFILE
-		mv miruku_d7_base.info $PROJECT_INFO
-	fi
+	mv $PROJECT_PATH/base.make $PROJECT_MAKE
+	mv $PROJECT_PATH/base.profile $PROJECT_PROFILE
+	mv $PROJECT_PATH/base.info $PROJECT_INFO
 	
 	# Edit .make title
-	eval "sed -i s#miruku_base.make#miruku_$PROJECT_NAME.make# $PROJECT_MAKE"
+	eval "sed -i s#base.make#$PROJECT_NAME.make# $PROJECT_MAKE"
+	
+  # Edit .make profile title, download url
+  eval "sed -i s#profile_base#$PROJECT_NAME#g $PROJECT_MAKE"
+	eval "sed -i s#profile_git_location#$PROJECT_PATH# $PROJECT_MAKE"
 
-	# Edit .make theme project name
-	eval "sed -i s#miruku_theme#miruku_theme_$PROJECT_NAME#g $PROJECT_MAKE"
-	
-	# Edit .make theme project git path
-	eval "sed -i s#theme_git_location#$THEME_GIT# $PROJECT_MAKE"
-	
-	# Edit .make to pull profile and info in project platform
-	eval "sed -i s#profile_git_location#$CONFIG_GIT# $PROJECT_MAKE"
-	eval "sed -i s#miruku_profile_base#$PROFILE_SHORT#g $PROJECT_MAKE"
-	
 	# Edit .info for Profile settings
 	eval "sed -i s#Base#$PROJECT_NAME#g $PROJECT_INFO"
-	if [ "$DRUPAL_VERSION" = "6" ]; then eval "sed -i s/miruku_theme/$PROJECT_NAME/g $PROJECT_INFO" ; fi
-	if [ "$DRUPAL_VERSION" = "7" ]; then eval "sed -i s/miruku_theme/$PROJECT_NAME/g $PROJECT_INFO" ; fi
+	eval "sed -i s#base_theme#$PROJECT_NAME#g $PROJECT_INFO"
 	
 	# Edit .profile name argument
-	eval "sed -i s/yourprofile/$PROFILE_SHORT/ $PROJECT_PROFILE"
+	eval "sed -i s#yourprofile#$PROJECT_NAME# $PROJECT_PROFILE"
 	
 	# Ask if any changes need to be made to the .make
 	echo
-	echo "*** Please edit project .make and .info if so required"
-	read -p "*** Press return to continue"
+	echo "* Edit project .make and .info if required"
+  echo
+  if [ "$INTERACTIVE_MODE" = "0" ]; then read -p "*** Press return to continue"; fi
 	echo
 	
-	# Remove renamed files from Git repo
+	# Setup subtheme
+	mkdir -p $SUB_THEME ; cd $SUB_THEME
+	echo "; $BASE_THEME subtheme" > $PROJECT_NAME.info
+	echo "" >> $PROJECT_NAME.info
+	echo "name = $PROJECT_NAME" >> $PROJECT_NAME.info
+	echo "description = $BASE_THEME subtheme for $PROJECT_NAME" >> $PROJECT_NAME.info
+  echo "core = $DRUPAL_VERSION.x" >> $PROJECT_NAME.info
+	echo "engine = phptemplate" >> $PROJECT_NAME.info
+	echo "base theme = $BASE_THEME" >> $PROJECT_NAME.info
+	echo "" >> $PROJECT_NAME.info
+	echo "stylesheets[all][] = css/$PROJECT_NAME.css" >> $PROJECT_NAME.info
+	mkdir css
+	touch css/$PROJECT_NAME.css
+
+	# cp ../$BASE_THEME/template.php template.php
+	#	eval "sed -i s#YOURTHEMENAME#$PROJECT_NAME#g template.php"
+
+	# Ask to manually edit the theme before comitting
+	echo "* Edit theme if so required"
+  echo
+  if [ "$INTERACTIVE_MODE" = "0" ]; then read -p "*** Press return to continue"; fi
+	echo
+
+  cd $PROJECT_PATH
+  # Remove files deleted from staging from repo	
 	git ls-files --deleted | xargs git rm
-	
 	# Add all files in folder respecting .gitignore, so not using --all
 	git add .
-	
 	# Make the commit
-	git commit -m "First commit for $PROJECT_NAME"
+	git commit -m "First commit; project $PROJECT_NAME"
 	echo
 }
 
@@ -301,7 +303,7 @@ makeproject() {
 ### Create and Aegerise site
 
 aegirplatform() {
-	echo "* Start doing Drush things now..."
+	echo "* Provisioning platform and site now"
 	echo
 	
 	# Set the queue to run every 1 second, so we can force the dispatch command
@@ -309,53 +311,59 @@ aegirplatform() {
 	echo
 	
 	# Build platform with Drush Make
-	echo "drush make --working-copy $PROJECT_MAKE $PROJECT_PLATFORM"
-	MIRUKU_PROV=stage3_aegirthings_platform_files
-	drush make --working-copy "$PROJECT_MAKE" "$PROJECT_PLATFORM" "$VERBOSE_MODE"
+	FF_STAGE=stage3_aegirthings_platform_files
+	echo "drush make --working-copy $PROJECT_MAKE $PLATFORM_PATH"
+  echo
+  if [ "$INTERACTIVE_MODE" = "0" ]; then read -p "*** Press return to continue"; echo; fi
+	drush make --working-copy "$PROJECT_MAKE" "$PLATFORM_PATH" "$VERBOSE_MODE"
 	echo
-	
+
+  if [ "$INTERACTIVE_MODE" = "0" ]; then read -p "*** Press return to continue"; echo; fi
 	# Set an Aegir context for that platform
-	echo "drush provision-save '@platform_$PROJECT_NAME' --root='$PROJECT_PLATFORM' --context_type='platform'"
-	MIRUKU_PROV=stage4_aegirthings_platform_filesdrush
-	drush provision-save "@platform_$PROJECT_NAME" --root="$PROJECT_PLATFORM" --context_type="platform" "$VERBOSE_MODE"
+	FF_STAGE=stage4_aegirthings_platform_filesdrush
+	echo "drush provision-save "@platform_"$PLATFORM_NAME"" --root=""$PLATFORM_PATH"" --context_type=platform'"
+  if [ "$INTERACTIVE_MODE" = "0" ]; then read -p "*** Press return to continue"; echo; fi
+	drush provision-save "@platform_"$PLATFORM_NAME"" --root="$PLATFORM_PATH" --context_type=platform "$VERBOSE_MODE"
 	drush @hostmaster hosting-dispatch
 	echo
 	
 	# Import that platform into hostmaster, the Aegir frontend
-	echo "drush @hostmaster hosting-import '@platform_$PROJECT_NAME'"
-	drush @hostmaster hosting-import "@platform_$PROJECT_NAME" "$VERBOSE_MODE"
+	echo "drush @hostmaster hosting-import '@platform_"$PLATFORM_NAME"'"
+  if [ "$INTERACTIVE_MODE" = "0" ]; then read -p "*** Press return to continue"; echo; fi
+	drush @hostmaster hosting-import "@platform_"$PLATFORM_NAME"" "$VERBOSE_MODE"
 	drush @hostmaster hosting-dispatch
 	echo
 }
 
 aegirsite() {
 	# Set a site context in Aegir using the new platform and profile
-	echo "drush provision-save '@$PROJECT_DOMAIN' --uri='$PROJECT_DOMAIN' --context_type='site' --platform='@platform_$PROJECT_NAME' --profile='miruku_$PROJECT_NAME' --db_server=@server_master" "$VERBOSE_MODE"
-	MIRUKU_PROV=stage5_aegirthings_platform_filesdrushsite
-
-	drush --uri="$PROJECT_DOMAIN" provision-save "@$PROJECT_DOMAIN" --context_type='site' --platform="@platform_$PROJECT_NAME" --profile="$PROFILE_SHORT" "$VERBOSE_MODE"
+	FF_STAGE=stage5_aegirthings_platform_filesdrushsite
+	echo "drush provision-save @$SITE_DOMAIN --uri='$SITE_DOMAIN' --context_type='site' --platform='@platform_"$PLATFORM_NAME"' --profile='$PROJECT_NAME' --db_server=@server_master" "$VERBOSE_MODE"
+  if [ "$INTERACTIVE_MODE" = "0" ]; then read -p "*** Press return to continue"; fi
+	drush provision-save "@$SITE_DOMAIN" --uri="$SITE_DOMAIN" --context_type='site' --platform="@platform_"$PLATFORM_NAME"" --profile="$PROJECT_NAME" "$VERBOSE_MODE" --debug
 
 	drush @hostmaster hosting-dispatch
 	echo
 	
+  if [ "$INTERACTIVE_MODE" = "0" ]; then read -p "*** Press return to continue"; fi
+
 	# Install site (init DB, etc.)
-	echo "drush @$PROJECT_DOMAIN provision-install"
-	echo
-	cd $PROJECT_PLATFORM
-	drush "@$PROJECT_DOMAIN" provision-install "$VERBOSE_MODE"
+  # context then command
+	cd $PLATFORM_PATH
+	echo "drush @$SITE_DOMAIN provision-install --debug"
+  drush "@$SITE_DOMAIN" provision-install "$VERBOSE_MODE" --debug #--ssh-options="p=321" 
 	drush @hostmaster hosting-dispatch
 	echo
 	
-	cp /var/aegir/basefiles/local.settings.php $PROJECT_PLATFORM/sites/$PROJECT_DOMAIN/
+	cp $FF_PATH/base/local.settings.php $PLATFORM_PATH/sites/$SITE_DOMAIN/
 	
-	# Verify the platform to auto-'import' the site in the frontend
-	echo "drush @hostmaster hosting-task @platform_$PROJECT_NAME verify"
-	drush @hostmaster hosting-task @platform_$PROJECT_NAME verify --force "$VERBOSE_MODE"
-	drush @hostmaster hosting-dispatch
+	# Verify the platform to auto-'import' the site in the frontend test.
+	echo "drush @hostmaster hosting-task @platform_"$PLATFORM_NAME" verify"
+	drush @hostmaster hosting-task @platform_"$PLATFORM_NAME" verify --force "$VERBOSE_MODE"
 	echo
 	
 	# Supply an admin reset password address
-	cd $PROJECT_PLATFORM/sites/$PROJECT_DOMAIN
+	cd $PLATFORM_PATH/sites/$SITE_DOMAIN
 	echo "* One-time login url:"
 	drush user-login 
 	echo
@@ -365,82 +373,35 @@ aegirsite() {
 # Removing things
 
 removesite() {
-	echo "*** Removing site"
-
+	echo "*** Removing site: drush @hostmaster hosting-task @"$SITE_DOMAIN" delete --force"
+  if [ "$INTERACTIVE_MODE" = "0" ]; then read -p "*** Press return to continue"; fi
 	# Create delete site task in hostmaster
-	drush @hostmaster hosting-task @"$PROJECT_DOMAIN" delete
+	drush @hostmaster hosting-task @"$SITE_DOMAIN" delete --force --debug
 	drush @hostmaster hosting-dispatch
 }
 
 
 removeplatform() {
-	echo "*** Removing platform"
-
-	# Create delete site task in hostmaster
-	drush @hostmaster hosting-task @"$PROJECT_DOMAIN" delete
-	drush @hostmaster hosting-dispatch
-
+	echo "*** Removing platform: drush @hostmaster hosting-task @platform_"$PLATFORM_NAME" delete --force"
+  if [ "$INTERACTIVE_MODE" = "0" ]; then read -p "*** Press return to continue"; fi
 	# Create delete platform task in hostmaster
-	drush @hostmaster hosting-task @platform_"$PROJECT_NAME" delete
-	drush @hostmaster hosting-dispatch
+	drush @hostmaster hosting-task @platform_"$PLATFORM_NAME" delete --force --debug
+	drush @hostmaster hosting-dispatch --debug
 
-
-    	# Removes site files, db and vhost
-    	#drush "@$PROJECT_DOMAIN" provision-delete --force
-
-    	# Removes Drush site alias
-    	#drush provision-save --root="$PROJECT_PLATFORM" "@$PROJECT_DOMAIN" --delete --force
-    	#drush @hostmaster hosting-dispatch
-
-    	# Removes Drush platform alias
-    	#drush provision-save "@platform_$PROJECT_NAME" --root="$PROJECT_PLATFORM" --delete --force
-	#drush @hostmaster hosting-dispatch
-
-    	if [ -d $PROJECT_PLATFORM ]; then rm -rf $PROJECT_PLATFORM ; fi
-    exit
+  #if [ -d $PLATFORM_PATH ]; then rm -rf $PLATFORM_PATH ; fi
 }
 
 
 removeproject() {
 	echo "*** Removing platform and project"
 
-        # Create delete site task in hostmaster
-        drush @hostmaster hosting-task @"$PROJECT_DOMAIN" delete
-        drush @hostmaster hosting-dispatch
-
-        # Create delete task in hostmaster
-        #drush @hostmaster hosting-task @platform_"$PROJECT_NAME" delete
-        #drush @hostmaster hosting-dispatch
-
-	# Removes site files, db and vhost
-    	#drush "@$PROJECT_DOMAIN" provision-delete --force
-
-    	# Removes Drush site alias
-    	#drush provision-save --root="$PROJECT_PLATFORM" "@$PROJECT_DOMAIN" --delete --force
-    	#drush @hostmaster hosting-dispatch
-
-	# Removes Drush platform alias
-	#drush provision-save "@platform_$PROJECT_NAME" --root="$PROJECT_PLATFORM" --delete --force
-    	#drush @hostmaster hosting-dispatch
-
-    	if [ -d $PROJECT_DIR ]; then rm -rf $PROJECT_DIR ; fi
-        if [ -d $PROJECT_PLATFORM ]; then rm -rf $PROJECT_PLATFORM ; fi
-        echo
-    exit
+ 	#if [ -d $PROJECT_PATH ]; then rm -rf $PROJECT_PATH ; fi
+  #if [ -d $PLATFORM_PATH ]; then rm -rf $PLATFORM_PATH ; fi
+  echo
+  exit
 }
 
 
 
-# Run the program
-
-dependencies
-getoptions "$@"
-setvariables
-
-if [ "$SCRIPT_TASK" = "a" ]; then makeproject ; fi
-if [ "$SCRIPT_TASK" = "a" ]; then aegirplatform ; fi
-if [ "$SCRIPT_TASK" = "a" ] || [ "$SCRIPT_TASK" = "b" ]; then aegirsite ; fi
-
-if [ "$SCRIPT_TASK" = "r" ]; then removesite ; fi
-if [ "$SCRIPT_TASK" = "ra" ]; then removeplatform ; fi
-if [ "$SCRIPT_TASK" = "rb" ]; then removeproject ; fi
+# Run the script
+scriptprocess "$@"
