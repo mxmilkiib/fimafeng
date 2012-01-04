@@ -1,0 +1,3 @@
+[submodule "base/d7base.git"]
+	path = base/d7base.git
+	url = git@github.com:milkmiruku/d7base.git
