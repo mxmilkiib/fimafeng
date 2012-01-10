@@ -9,14 +9,12 @@ note:
   ./projects - will contain project profile (.make/.info/theme) git repos (cloned from ./base)
 
 installation:
-  clone the script to something like /var/aegir/ff
-
-  cd ff
+  cd /var/aegir
+  git clone git@github.com:milkmiruku/fimafeng.git ff
   git submodule add git@github.com:milkmiruku/d7base.git base/d7base.git
   git submodule add git@github.com:milkmiruku/d7core.git base/d7core.git
-
   wget http://shflags.googlecode.com/files/shflags-1.0.3.tgz
-  tar xvzf shflags-1.0.3.tg
+  tar xvzf shflags-1.0.3.tgz
 
 usage:
   ./fimafeng.sh --help
