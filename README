@@ -15,6 +15,7 @@ installation:
   git submodule add git@github.com:milkmiruku/d7core.git base/d7core.git
   wget http://shflags.googlecode.com/files/shflags-1.0.3.tgz
   tar xvzf shflags-1.0.3.tgz
+  mkdir projects
 
 usage:
   ./fimafeng.sh --help
