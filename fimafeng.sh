@@ -270,9 +270,9 @@ makeproject() {
 
 
 	# Setup theme
-	mkdir -p $THEMES_PATH && cd $THEMES_PATH
-  git submodule add http://git.drupal.org/project/$BASE_THEME.git 
-  cd $BASE_THEME ; git checkout $BASE_THEME_BRANCH
+	cd $PROJECT_PATH
+  git submodule add http://git.drupal.org/project/$BASE_THEME.git themes/$BASE_THEME
+  cd themes/$BASE_THEME ; git checkout $BASE_THEME_BRANCH
   
 
 #	echo "; $BASE_THEME subtheme" > $PROJECT_NAME.info
