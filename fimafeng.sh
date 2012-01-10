@@ -83,6 +83,8 @@ scriptprocess() {
   if [ "$SCRIPT_TASK" = "rc" ]; then removesite ; fi
   if [ "$SCRIPT_TASK" = "rb" ]; then removeplatform ; fi
   if [ "$SCRIPT_TASK" = "ra" ]; then removeproject ; fi
+  if [ "$SCRIPT_TASK" = "rcb" ]; then removesite ; remove platform ; fi
+  if [ "$SCRIPT_TASK" = "rcba" ]; then removesite ; remove platform ; remove project ; fi 
 }
 
 
@@ -170,7 +172,7 @@ variablechecks() {
 
 	if [ "$BASE_THEME" = "DEFAULT" ] ; then                                   # If no theme is set, use garland for D6, squaregrid for D7
   	if [ "$DRUPAL_VERSION" = "6" ]; then BASE_THEME="om" ; BASE_THEME_BRANCH="6.x-2.x"  ; fi
-	  if [ "$DRUPAL_VERSION" = "7" ]; then BASE_THEME="sasson" ; BASE_THEME_BRANCH="7.x-2.0-beta3" ; fi
+	  if [ "$DRUPAL_VERSION" = "7" ]; then BASE_THEME="sasson" ; BASE_THEME_BRANCH="7.x-2.x" ; fi
   fi
 
 	AEGIR_PATH=$HOME                                       	                  # The Aegir dir, typically /var/aegir
