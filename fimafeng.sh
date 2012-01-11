@@ -83,8 +83,8 @@ scriptprocess() {
   if [ "$SCRIPT_TASK" = "rc" ]; then removesite ; fi
   if [ "$SCRIPT_TASK" = "rb" ]; then removeplatform ; fi
   if [ "$SCRIPT_TASK" = "ra" ]; then removeproject ; fi
-  if [ "$SCRIPT_TASK" = "rcb" ]; then removesite ; remove platform ; fi
-  if [ "$SCRIPT_TASK" = "rcba" ]; then removesite ; remove platform ; remove project ; fi 
+  if [ "$SCRIPT_TASK" = "rcb" ]; then removesite ; removeplatform ; fi
+  if [ "$SCRIPT_TASK" = "rcba" ]; then removesite ; removeplatform ; removeproject ; fi 
 }
 
 
@@ -121,7 +121,7 @@ getoptions() {
   DEFINE_string 'drupal' '7' 'Drupal version (default is D7)' 'd'
   DEFINE_boolean 'verbose' 'false' 'Verbose mode for Git and Drush' 'v'
   DEFINE_boolean 'usage' 'false' 'Usage string examples' 'u'
-  DEFINE_boolean 'interactive' 'true' 'Prompt for continuation at points' 'i'
+  DEFINE_boolean 'interactive' 'true' 'Set this for autopilot' 'i'
   DEFINE_string 'theme' 'DEFAULT' 'Base theme to use' 't'
   DEFINE_string 'themebranch' '' 'Branch of theme to use' 'b'
 
@@ -215,8 +215,10 @@ variablechecks() {
     echo ": c - Use existing project and platform, provision site"
     if  [ -d "$SITE_PATH" ]; then echo " Build fail: site aready exists" ; exit 1 ; fi
   elif [ "$SCRIPT_TASK" == "rc" ] ; then echo ": rc - Removing site"
-  elif [ "$SCRIPT_TASK" == "rb" ] ; then echo ": rb - Removing platform and site"
-  elif [ "$SCRIPT_TASK" == "ra" ] ; then echo ": ra - Removing project, platform and site"
+  elif [ "$SCRIPT_TASK" == "rb" ] ; then echo ": rb - Removing platform"
+  elif [ "$SCRIPT_TASK" == "ra" ] ; then echo ": ra - Removing project"
+  elif [ "$SCRIPT_TASK" == "rcb" ] ; then echo ": rcd - Removing site and platform"
+  elif [ "$SCRIPT_TASK" == "rcba" ] ; then echo ": rcba - Removing site, platform and project"
   else echo " fail: $SCRIPT_TASK" ; exit 1 ; fi
 	if [ "$VERBOSE_MODE" == "0" ]; then
     echo ""
@@ -266,17 +268,13 @@ makeproject() {
 	# Ask if any changes need to be made to the .make
 	echo
 	echo "* Edit project .make and .info if required"
-  echo
   ifinteractive
-	echo
 
-
-	# Setup theme
+	# Setup theme submodule
 	cd $PROJECT_PATH
   git submodule add http://git.drupal.org/project/$BASE_THEME.git themes/$BASE_THEME
   cd themes/$BASE_THEME ; git checkout $BASE_THEME_BRANCH
   
-
 #	echo "; $BASE_THEME subtheme" > $PROJECT_NAME.info
 #	echo "" >> $PROJECT_NAME.info
 #	echo "name = $PROJECT_NAME" >> $PROJECT_NAME.info
@@ -293,10 +291,9 @@ makeproject() {
 	#	eval "sed -i s#YOURTHEMENAME#$PROJECT_NAME#g template.php"
 
 	# Ask to manually edit the theme before comitting
-	echo "* Edit theme if so required"
   echo
+	echo "* Edit theme if so required"
   ifinteractive
-	echo
 
   cd $PROJECT_PATH
   # Remove files deleted from staging from repo	
@@ -322,10 +319,10 @@ aegirplatform() {
 	# Build platform with Drush Make
 	FF_STAGE=stage3_aegirthings_platform_files
 	echo "drush make --working-copy $PROJECT_MAKE $PLATFORM_PATH"
-  echo
   ifinteractive
-	drush make --working-copy "$PROJECT_MAKE" "$PLATFORM_PATH" "$VERBOSE_MODE"
-	echo
+	drush make --working-copy "$PROJECT_MAKE" "$PLATFORM_PATH" "$VERBOSE_MODE" --debug
+
+  if [ ! -d "$PLATFORM_PATH" ] then echo "Build fail; no platform path"; exit ; fi
 
   ifinteractive
 	# Set an Aegir context for that platform
@@ -334,7 +331,6 @@ aegirplatform() {
   ifinteractive
 	drush provision-save "@platform_"$PLATFORM_NAME"" --root="$PLATFORM_PATH" --context_type=platform "$VERBOSE_MODE"
 	drush @hostmaster hosting-dispatch
-	echo
 	
 	# Import that platform into hostmaster, the Aegir frontend
 	echo "drush @hostmaster hosting-import '@platform_"$PLATFORM_NAME"'"
@@ -352,13 +348,12 @@ aegirsite() {
 	drush provision-save "@$SITE_DOMAIN" --uri="$SITE_DOMAIN" --context_type='site' --platform="@platform_"$PLATFORM_NAME"" --profile="$PROJECT_NAME" "$VERBOSE_MODE" --debug
 
 	drush @hostmaster hosting-dispatch
-	echo
   ifinteractive
 	# Install site (init DB, etc.)
   # context then command
 	cd $PLATFORM_PATH
-	echo "drush @$SITE_DOMAIN provision-install --debug"
-  drush "@$SITE_DOMAIN" provision-install "$VERBOSE_MODE" --debug #--ssh-options="p=321" 
+	echo "drush @$SITE_DOMAIN provision-install"
+  drush "@$SITE_DOMAIN" provision-install "$VERBOSE_MODE"
 	drush @hostmaster hosting-dispatch
 	echo
 	
@@ -383,7 +378,7 @@ removesite() {
 	echo "* Removing site: drush @hostmaster hosting-task @"$SITE_DOMAIN" delete --force"
   ifinteractive
 	# Create delete site task in hostmaster
-	drush @hostmaster hosting-task @"$SITE_DOMAIN" delete --force --debug
+	drush @hostmaster hosting-task @"$SITE_DOMAIN" delete --force
 	drush @hostmaster hosting-dispatch
 }
 
@@ -392,7 +387,7 @@ removeplatform() {
 	echo "* Removing platform: drush @hostmaster hosting-task @platform_"$PLATFORM_NAME" delete --force"
   ifinteractive
 	# Create delete platform task in hostmaster
-	drush @hostmaster hosting-task @platform_"$PLATFORM_NAME" delete --force --debug
+	drush @hostmaster hosting-task @platform_"$PLATFORM_NAME" delete --force 
 	drush @hostmaster hosting-dispatch --debug
 }
 
