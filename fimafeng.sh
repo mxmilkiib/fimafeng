@@ -368,6 +368,14 @@ aegirsite() {
 	echo "* One-time login url:"
 	drush user-login 
 	echo
+
+  if [ $THEME_BASE = "sasson" ]; then
+    mv $PLATFORM_PATH/profiles/$PROJECT_NAME/themes/sasson/SUBTHEME $PLATFORM_PATH/profiles/$PROJECT_NAME/themes/$PROJECT_NAME
+  fi
+
+  cd $PLATFORM_PATH/profiles/$PROJECT_NAME
+  git checkout -b master
+  git commit -am "First deployed profile commit"
 }
 
 
