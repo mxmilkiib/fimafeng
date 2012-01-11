@@ -178,8 +178,8 @@ variablechecks() {
 	AEGIR_PATH=$HOME                                       	                  # The Aegir dir, typically /var/aegir
   FF_PATH="$AEGIR_PATH/ff"                                                  # Path of this script
 
-  if [ "$DRUPAL_VERSION" = "6" ]; then BASE_PROJECT=$FF_PATH/base/d6core.git/ ; fi
-  if [ "$DRUPAL_VERSION" = "7" ]; then BASE_PROJECT=$FF_PATH/base/d7core.git/ ; fi
+  if [ "$DRUPAL_VERSION" = "6" ]; then BASE_PROJECT=$FF_PATH/base/d6base.git/ ; fi
+  if [ "$DRUPAL_VERSION" = "7" ]; then BASE_PROJECT=$FF_PATH/base/d7base.git/ ; fi
 
   if [ ! -d "$BASE_PROJECT" ]; then echo "$BASE_PROJECT doesn't exist, exiting" ; fi
 
@@ -272,8 +272,7 @@ makeproject() {
 
 	# Setup theme submodule
 	cd $PROJECT_PATH
-  git submodule add http://git.drupal.org/project/$BASE_THEME.git themes/$BASE_THEME
-  cd themes/$BASE_THEME ; git checkout $BASE_THEME_BRANCH
+  git submodule add -b $BASE_THEME_BRANCH http://git.drupal.org/project/$BASE_THEME.git themes/$BASE_THEME
   
 #	echo "; $BASE_THEME subtheme" > $PROJECT_NAME.info
 #	echo "" >> $PROJECT_NAME.info
@@ -322,7 +321,7 @@ aegirplatform() {
   ifinteractive
 	drush make --working-copy "$PROJECT_MAKE" "$PLATFORM_PATH" "$VERBOSE_MODE" --debug
 
-  if [ ! -d "$PLATFORM_PATH" ] then echo "Build fail; no platform path"; exit ; fi
+  if [ ! -d "$PLATFORM_PATH" ]; then echo "Build fail; no platform path"; exit ; fi
 
   ifinteractive
 	# Set an Aegir context for that platform
