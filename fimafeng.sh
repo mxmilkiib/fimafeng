@@ -319,7 +319,7 @@ aegirplatform() {
 	FF_STAGE=stage3_aegirthings_platform_files
 	echo "drush make --working-copy $PROJECT_MAKE $PLATFORM_PATH"
   ifinteractive
-	drush make --working-copy "$PROJECT_MAKE" "$PLATFORM_PATH" "$VERBOSE_MODE" --debug
+	drush make --working-copy "$PROJECT_MAKE" "$PLATFORM_PATH" "$VERBOSE_MODE" 
 
   if [ ! -d "$PLATFORM_PATH" ]; then echo "Build fail; no platform path"; exit ; fi
 
@@ -395,7 +395,7 @@ removeplatform() {
   ifinteractive
 	# Create delete platform task in hostmaster
 	drush @hostmaster hosting-task @platform_"$PLATFORM_NAME" delete --force 
-	drush @hostmaster hosting-dispatch --debug
+	drush @hostmaster hosting-dispatch 
 }
 
 
