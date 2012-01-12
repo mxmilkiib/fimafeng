@@ -272,6 +272,7 @@ makeproject() {
 
 	# Setup theme submodule
 	cd $PROJECT_PATH
+  git config receive.denyCurrentBranch warn             # Allows pushing back to this non-bare repo
   git submodule add -b $BASE_THEME_BRANCH http://git.drupal.org/project/$BASE_THEME.git themes/$BASE_THEME
   
 #	echo "; $BASE_THEME subtheme" > $PROJECT_NAME.info
