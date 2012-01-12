@@ -375,11 +375,12 @@ aegirsite() {
 
   if [ "$SCRIPT_TASK" = "rb" ]; then removeplatform ; fi
   
-  if [ "$THEME_BASE" = "sasson" ]; then
+  if [ "$BASE_THEME" = "sasson" ]; then
     mv $PLATFORM_PATH/profiles/$PROJECT_NAME/themes/sasson/SUBTHEME $PLATFORM_PATH/profiles/$PROJECT_NAME/themes/$PROJECT_NAME
+    git add themes/$PROJECT_NAME
+    git commit -am "First deployed profile commit, subtheme mv"
   fi
 
-  git commit -am "First deployed profile commit"
 }
 
 
