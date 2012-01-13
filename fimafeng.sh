@@ -196,6 +196,7 @@ variablechecks() {
 	PLATFORM_PATH=$AEGIR_PATH/platforms/$PLATFORM_NAME                        # Project platform folder
 
   SITE_PATH=$PLATFORM_PATH/sites/$SITE_DOMAIN
+  PROFILE_PATH=$PLATFORM_PATH/profiles/$PROJECT_NAME
 
   echo "Fimafeng provision script for Aegir"
   echo ""
@@ -376,9 +377,16 @@ aegirsite() {
   if [ "$SCRIPT_TASK" = "rb" ]; then removeplatform ; fi
   
   if [ "$BASE_THEME" = "sasson" ]; then
-    mv $PLATFORM_PATH/profiles/$PROJECT_NAME/themes/sasson/SUBTHEME $PLATFORM_PATH/profiles/$PROJECT_NAME/themes/$PROJECT_NAME
+    mv $PROFILE_PATH/themes/sasson/SUBTHEME $PROFILE_PATH/themes/$PROJECT_NAME
+    mv $PROFILE_PATH/themes/$PROJECT_NAME/SUBTHEME.info $PROFILE_PATH/themes/$PROJECT_NAME/$PROJECT_NAME.info
+
+    eval "sed -i s#Starterkit#$PROJECT_NAME#g $PROFILE_PATH/themes/$PROJECT_NAME/$PROJECT_NAME.info"
+    eval "sed -i s#SUBTHEME#$PROJECT_NAME#g $PROFILE_PATH/themes/$PROJECT_NAME/$PROJECT_NAME.info"
+
+    mv $PROFILE_PATH/themes/$PROJECT_NAME/styles/SUBTHEME.scss $PROFILE_PATH/themes/$PROJECT_NAME/styles/$PROJECT_NAME.scss
+
     git add themes/$PROJECT_NAME
-    git commit -am "First deployed profile commit, subtheme mv"
+    git commit -am "First deployed profile commit, subtheme mv, etc."
   fi
 
 }
