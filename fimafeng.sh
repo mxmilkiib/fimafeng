@@ -374,18 +374,13 @@ aegirsite() {
   cd $PLATFORM_PATH/profiles/$PROJECT_NAME
   git submodule update --init
  
-  #if [ "$BASE_THEME" = "sasson" ]; then
-  #  mv $PROFILE_PATH/themes/sasson/SUBTHEME $PROFILE_PATH/themes/$PROJECT_NAME
-  #  mv $PROFILE_PATH/themes/$PROJECT_NAME/SUBTHEME.info $PROFILE_PATH/themes/$PROJECT_NAME/$PROJECT_NAME.info
-
-  #  eval "sed -i s#Starterkit#$PROJECT_NAME#g $PROFILE_PATH/themes/$PROJECT_NAME/$PROJECT_NAME.info"
-  #  eval "sed -i s#SUBTHEME#$PROJECT_NAME#g $PROFILE_PATH/themes/$PROJECT_NAME/$PROJECT_NAME.info"
-
-  #  mv $PROFILE_PATH/themes/$PROJECT_NAME/styles/SUBTHEME.scss $PROFILE_PATH/themes/$PROJECT_NAME/styles/$PROJECT_NAME.scss
-
-  #  git add themes/$PROJECT_NAME
-  #  git commit -am "First deployed profile commit, subtheme mv, etc."
-  #fi
+  if [ "$BASE_THEME" = "sasson" ]; then
+    cd $PLATFORM_PATH/sites/$SITE_DOMAIN
+    drush sns $PROJECT_NAME
+    cd $PLATFORM_PATH/profiles/$PROJECT_NAME
+    git add themes/$PROJECT_NAME
+    git commit -am "First deployed profile commit, subtheme mv, etc."
+  fi
 
 }
 
