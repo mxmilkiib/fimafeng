@@ -179,7 +179,7 @@ variablechecks() {
   FF_PATH="$AEGIR_PATH/ff"                                                  # Path of this script
 
   if [ "$DRUPAL_VERSION" = "6" ]; then BASE_PROJECT=$FF_PATH/base/d6base.git/ ; fi
-  if [ "$DRUPAL_VERSION" = "7" ]; then BASE_PROJECT=$FF_PATH/base/d7base.git/ ; fi
+  if [ "$DRUPAL_VERSION" = "7" ]; then BASE_PROJECT=$FF_PATH/base/d7core.git ; fi
 
   if [ ! -d "$BASE_PROJECT" ]; then echo "$BASE_PROJECT doesn't exist, exiting" ; fi
 
@@ -376,12 +376,14 @@ aegirsite() {
  
   if [ "$BASE_THEME" = "sasson" ]; then
     cd $PLATFORM_PATH/sites/$SITE_DOMAIN
+    echo $PLATFORM_PATH/sites/$SITE_DOMAIN
+    drush en sasson -y
     drush sns $PROJECT_NAME
+    drush en $PROJECT_NAME -y
     cd $PLATFORM_PATH/profiles/$PROJECT_NAME
     git add themes/$PROJECT_NAME
     git commit -am "First deployed profile commit, subtheme mv, etc."
   fi
-
 }
 
 
