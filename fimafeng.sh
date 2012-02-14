@@ -122,6 +122,7 @@ getoptions() {
   DEFINE_boolean 'verbose' 'false' 'Verbose mode for Git and Drush' 'v'
   DEFINE_boolean 'usage' 'false' 'Usage string examples' 'u'
   DEFINE_boolean 'interactive' 'true' 'Set this for autopilot' 'i'
+  DEFINE_boolean 'edit' 'true' 'Set to edit theme and profile files.' 'e'
   DEFINE_string 'theme' 'DEFAULT' 'Base theme to use' 't'
   DEFINE_string 'themebranch' '' 'Branch of theme to use' 'b'
 
@@ -141,6 +142,7 @@ getoptions() {
   VERBOSE_MODE="${FLAGS_verbose}"
   USAGE_MODE="${FLAGS_usage}"
   INTERACTIVE_MODE="${FLAGS_interactive}"
+  EDIT_MODE="${FLAGS_edit}"
 
 	# Date string; year, month, day, hours, seconds
 	DATE="date +%Y%m%d%H%M%S"
@@ -179,7 +181,7 @@ variablechecks() {
   FF_PATH="$AEGIR_PATH/ff"                                                  # Path of this script
 
   if [ "$DRUPAL_VERSION" = "6" ]; then BASE_PROJECT=$FF_PATH/base/d6base.git/ ; fi
-  if [ "$DRUPAL_VERSION" = "7" ]; then BASE_PROJECT=$FF_PATH/base/d7core.git ; fi
+  if [ "$DRUPAL_VERSION" = "7" ]; then BASE_PROJECT=$FF_PATH/base/d7base.git ; fi
 
   if [ ! -d "$BASE_PROJECT" ]; then echo "$BASE_PROJECT doesn't exist, exiting" ; fi
 
@@ -269,7 +271,7 @@ makeproject() {
 	# Ask if any changes need to be made to the .make
 	echo
 	echo "* Edit project .make and .info if required"
-  ifinteractive
+  ifedit
 
 	# Setup theme submodule
 	cd $PROJECT_PATH
@@ -294,7 +296,7 @@ makeproject() {
 	# Ask to manually edit the theme before comitting
   echo
 	echo "* Edit theme if so required"
-  ifinteractive
+  ifedit
 
   cd $PROJECT_PATH
   # Remove files deleted from staging from repo	
@@ -418,6 +420,14 @@ removeproject() {
 
 ifinteractive() {
   if [ "$INTERACTIVE_MODE" = "0" ]; then 
+    echo ""
+    read -p "*** Press return to continue";
+    echo ""
+  fi
+}
+
+ifedit() {
+  if [ "$EDIT_MODE" = "0" ]; then 
     echo ""
     read -p "*** Press return to continue";
     echo ""
